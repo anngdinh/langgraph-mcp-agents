@@ -28,6 +28,7 @@ from langchain_core.messages.ai import AIMessageChunk
 from langchain_core.messages.tool import ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Load environment variables (get API keys and settings from .env file)
 load_dotenv(override=True)
@@ -457,22 +458,27 @@ async def initialize_session(mcp_config=None):
         # Initialize appropriate model based on selection
         selected_model = st.session_state.selected_model
 
-        if selected_model in [
-            "claude-3-7-sonnet-latest",
-            "claude-3-5-sonnet-latest",
-            "claude-3-5-haiku-latest",
-        ]:
-            model = ChatAnthropic(
-                model=selected_model,
-                temperature=0.1,
-                max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
-            )
-        else:  # Use OpenAI model
-            model = ChatOpenAI(
-                model=selected_model,
-                temperature=0.1,
-                max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
-            )
+        # if selected_model in [
+        #     "claude-3-7-sonnet-latest",
+        #     "claude-3-5-sonnet-latest",
+        #     "claude-3-5-haiku-latest",
+        # ]:
+        #     model = ChatAnthropic(
+        #         model=selected_model,
+        #         temperature=0.1,
+        #         max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
+        #     )
+        # else:  # Use OpenAI model
+            # model = ChatOpenAI(
+            #     model=selected_model,
+            #     temperature=0.1,
+            #     max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
+            # )
+        model = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            api_key=os.environ.get("GEMINI_API_KEY"),
+            temperature=0
+        )
         agent = create_react_agent(
             model,
             tools,
@@ -492,29 +498,18 @@ with st.sidebar:
     # Create list of available models
     available_models = []
 
-    # Check Anthropic API key
-    has_anthropic_key = os.environ.get("ANTHROPIC_API_KEY") is not None
-    if has_anthropic_key:
-        available_models.extend(
-            [
-                "claude-3-7-sonnet-latest",
-                "claude-3-5-sonnet-latest",
-                "claude-3-5-haiku-latest",
-            ]
-        )
-
-    # Check OpenAI API key
-    has_openai_key = os.environ.get("OPENAI_API_KEY") is not None
-    if has_openai_key:
-        available_models.extend(["gpt-4o", "gpt-4o-mini"])
+    # Check Gemini API key
+    has_gemini_key = os.environ.get("GEMINI_API_KEY") is not None
+    if has_gemini_key:
+        available_models.extend(["gemini-1.5-flash"])
 
     # Display message if no models are available
     if not available_models:
         st.warning(
-            "⚠️ API keys are not configured. Please add ANTHROPIC_API_KEY or OPENAI_API_KEY to your .env file."
+            "⚠️ API keys are not configured. Please add GEMINI_API_KEY to your .env file."
         )
         # Add Claude model as default (to show UI even without keys)
-        available_models = ["claude-3-7-sonnet-latest"]
+        available_models = ["gemini-1.5-flash"]
 
     # Model selection dropdown
     previous_model = st.session_state.selected_model
