@@ -4,6 +4,79 @@ import nest_asyncio
 import json
 import os
 import platform
+import xml.etree.ElementTree as ET
+import requests
+from lxml import etree
+import xml.dom.minidom
+
+ALLOWED_EMAILS = os.environ.get("ALLOWED_EMAILS").split(",") if os.environ.get("ALLOWED_EMAILS") else []
+CURRENT_URL = os.environ.get("CURRENT_URL", "http://localhost:8898/")
+# Initialize login session variables
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+    st.session_state.user_email = ""
+
+# Read query parameters from the URL
+params = st.query_params
+page = params.get("page")
+ticket = params.get("ticket")
+
+if True:
+    if ticket and not st.session_state.authenticated:
+        # Call your backend API to validate the ticket
+        response = requests.get(
+            f"https://sso-dev.vngcloud.vn/cas/p3/serviceValidate?service={CURRENT_URL}&ticket=" + ticket
+        )
+
+        if response.status_code == 200:
+            # add a button logout to redirect to the sso
+            if st.button("Logout"):
+                # Redirect to the SSO logout URL
+                st.markdown(
+                    f'<meta http-equiv="refresh" content="0;URL={f"https://sso-dev.vngcloud.vn/cas/logout?service={CURRENT_URL}"}">',
+                    unsafe_allow_html=True,
+                )
+                
+            # # Pretty-print the XML
+            # try:
+            #     dom = xml.dom.minidom.parseString(response.text)
+            #     pretty_xml = dom.toprettyxml()
+            #     st.code(pretty_xml, language='xml')
+            # except Exception as e:
+            #     st.error(f"Failed to format XML: {e}")
+            #     st.text("Raw response:")
+            #     st.text(response.text)
+
+            try:
+                # Parse the XML
+                root = ET.fromstring(response.text)
+                ns = {'cas': 'http://www.yale.edu/tp/cas'}
+
+                user_elem = root.find('.//cas:user', namespaces=ns)
+                if user_elem is not None:
+                    user_email = user_elem.text
+                    # print(user_email)
+                    st.success(f"Logged in as: {user_email}")
+
+                    if user_email not in ALLOWED_EMAILS:
+                        st.error(
+                            "You are not allowed to access this application.")
+                        st.stop()
+
+                    st.session_state.authenticated = True
+                    st.session_state.user_email = user_email
+                    st.success("✅ Login successful! Please wait...")
+                    st.rerun()
+                else:
+                    st.error("User not found in response.")
+                    st.stop()
+            except ET.ParseError as e:
+                st.error(f"Failed to parse CAS response: {e}")
+                st.stop()
+
+        else:
+            st.error("CAS ticket validation failed.")
+            st.stop()
 
 if platform.system() == "Windows":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -84,9 +157,6 @@ def save_config_to_json(config):
         st.error(f"Error saving settings file: {str(e)}")
         return False
 
-# Initialize login session variables
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
 
 # Check if login is required
 use_login = os.environ.get("USE_LOGIN", "false").lower() == "true"
@@ -97,35 +167,57 @@ if use_login and not st.session_state.authenticated:
     st.set_page_config(page_title="Agent with MCP Tools", page_icon="🧠")
 else:
     # Main app uses wide layout
-    st.set_page_config(page_title="Agent with MCP Tools", page_icon="🧠", layout="wide")
+    st.set_page_config(page_title="Agent with MCP Tools",
+                       page_icon="🧠", layout="wide")
 
 # Display login screen if login feature is enabled and not yet authenticated
 if use_login and not st.session_state.authenticated:
     st.title("🔐 Login")
     st.markdown("Login is required to use the system.")
 
-    # Place login form in the center of the screen with narrow width
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submit_button = st.form_submit_button("Login")
+    # add a button to redirect to the sso
+    sso_url = os.environ.get("SSO_URL")
+    if sso_url:
+        if st.button("Login with VNGCLOUD SSO"):
+            st.markdown(
+                f'<meta http-equiv="refresh" content="0;URL={f"https://sso-dev.vngcloud.vn/cas/login?service={CURRENT_URL}"}">', unsafe_allow_html=True)
+    else:
+        st.markdown(
+            "SSO URL is not configured. Please contact the administrator to set it up."
+        )
 
-        if submit_button:
-            expected_username = os.environ.get("USER_ID")
-            expected_password = os.environ.get("USER_PASSWORD")
+    # # Place login form in the center of the screen with narrow width
+    # with st.form("login_form"):
+    #     username = st.text_input("Username")
+    #     password = st.text_input("Password", type="password")
+    #     submit_button = st.form_submit_button("Login")
 
-            if username == expected_username and password == expected_password:
-                st.session_state.authenticated = True
-                st.success("✅ Login successful! Please wait...")
-                st.rerun()
-            else:
-                st.error("❌ Username or password is incorrect.")
+    #     if submit_button:
+    #         expected_username = os.environ.get("USER_ID")
+    #         expected_password = os.environ.get("USER_PASSWORD")
+
+    #         if username == expected_username and password == expected_password:
+    #             st.session_state.authenticated = True
+    #             st.success("✅ Login successful! Please wait...")
+    #             st.rerun()
+    #         else:
+    #             st.error("❌ Username or password is incorrect.")
 
     # Don't display the main app on the login screen
     st.stop()
 
+# add a button logout to redirect to the sso
+if st.sidebar.button("Logout"):
+    # Redirect to the SSO logout URL
+    st.sidebar.markdown(
+        # f'<meta http-equiv="refresh" content="0;URL={"https://sso-dev.vngcloud.vn/cas/logout"}">',
+        f'<meta http-equiv="refresh" content="0;URL={"https://sso-dev.vngcloud.vn/cas/logout?service=http://localhost:8898/"}">',
+        unsafe_allow_html=True,
+    )
+
 # Add author information at the top of the sidebar (placed before other sidebar elements)
-st.sidebar.markdown("### ✍️ Made by [TeddyNote](https://youtube.com/c/teddynote) 🚀")
+st.sidebar.markdown(
+    "### ✍️ Made by [TeddyNote](https://youtube.com/c/teddynote) 🚀")
 st.sidebar.markdown(
     "### 💻 [Project Page](https://github.com/teddynote-lab/langgraph-mcp-agents)"
 )
@@ -137,51 +229,12 @@ st.title("💬 MCP Tool Utilization Agent")
 st.markdown("✨ Ask questions to the ReAct agent that utilizes MCP tools.")
 
 SYSTEM_PROMPT = """<ROLE>
-You are a smart agent with an ability to use tools. 
-You will be given a question and you will use the tools to answer the question.
-Pick the most relevant tool to answer the question. 
-If you are failed to answer the question, try different tools to get context.
-Your answer should be very polite and professional.
-</ROLE>
-
-----
-
-<INSTRUCTIONS>
-Step 1: Analyze the question
-- Analyze user's question and final goal.
-- If the user's question is consist of multiple sub-questions, split them into smaller sub-questions.
-
-Step 2: Pick the most relevant tool
-- Pick the most relevant tool to answer the question.
-- If you are failed to answer the question, try different tools to get context.
-
-Step 3: Answer the question
-- Answer the question in the same language as the question.
-- Your answer should be very polite and professional.
-
-Step 4: Provide the source of the answer(if applicable)
-- If you've used the tool, provide the source of the answer.
-- Valid sources are either a website(URL) or a document(PDF, etc).
-
-Guidelines:
-- If you've used the tool, your answer should be based on the tool's output(tool's output is more important than your own knowledge).
-- If you've used the tool, and the source is valid URL, provide the source(URL) of the answer.
-- Skip providing the source if the source is not URL.
-- Answer in the same language as the question.
-- Answer should be concise and to the point.
-- Avoid response your output with any other information than the answer and the source.  
-</INSTRUCTIONS>
-
-----
-
-<OUTPUT_FORMAT>
-(concise answer to the question)
-
-**Source**(if applicable)
-- (source1: valid URL)
-- (source2: valid URL)
-- ...
-</OUTPUT_FORMAT>
+You are a helpful assistant that can utilize various tools to answer questions.
+You can use the tools to get information, perform calculations, and more.
+You can also ask clarifying questions if needed.
+You are not allowed to use the tools for any other purpose.
+You never always try to answer the question using your own knowledge first.
+If you need to use a tool, you should explain why you are using it.
 """
 
 OUTPUT_TOKEN_INFO = {
@@ -320,7 +373,8 @@ def get_streaming_callback(text_placeholder, tool_placeholder):
                 and len(message_content.tool_calls[0]["name"]) > 0
             ):
                 tool_call_info = message_content.tool_calls[0]
-                accumulated_tool.append("\n```json\n" + str(tool_call_info) + "\n```\n")
+                accumulated_tool.append(
+                    "\n```json\n" + str(tool_call_info) + "\n```\n")
                 with tool_placeholder.expander(
                     "🔧 Tool Call Information", expanded=True
                 ):
@@ -335,7 +389,8 @@ def get_streaming_callback(text_placeholder, tool_placeholder):
                 and message_content.invalid_tool_calls
             ):
                 tool_call_info = message_content.invalid_tool_calls[0]
-                accumulated_tool.append("\n```json\n" + str(tool_call_info) + "\n```\n")
+                accumulated_tool.append(
+                    "\n```json\n" + str(tool_call_info) + "\n```\n")
                 with tool_placeholder.expander(
                     "🔧 Tool Call Information (Invalid)", expanded=True
                 ):
@@ -359,7 +414,8 @@ def get_streaming_callback(text_placeholder, tool_placeholder):
                 and "tool_calls" in message_content.additional_kwargs
             ):
                 tool_call_info = message_content.additional_kwargs["tool_calls"][0]
-                accumulated_tool.append("\n```json\n" + str(tool_call_info) + "\n```\n")
+                accumulated_tool.append(
+                    "\n```json\n" + str(tool_call_info) + "\n```\n")
                 with tool_placeholder.expander(
                     "🔧 Tool Call Information", expanded=True
                 ):
@@ -469,11 +525,11 @@ async def initialize_session(mcp_config=None):
         #         max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
         #     )
         # else:  # Use OpenAI model
-            # model = ChatOpenAI(
-            #     model=selected_model,
-            #     temperature=0.1,
-            #     max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
-            # )
+        # model = ChatOpenAI(
+        #     model=selected_model,
+        #     temperature=0.1,
+        #     max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
+        # )
         model = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
             api_key=os.environ.get("GEMINI_API_KEY"),
@@ -565,8 +621,9 @@ with st.sidebar:
     with st.expander("🧰 Add MCP Tools", expanded=st.session_state.mcp_tools_expander):
         # Load settings from config.json file
         loaded_config = load_config_from_json()
-        default_config_text = json.dumps(loaded_config, indent=2, ensure_ascii=False)
-        
+        default_config_text = json.dumps(
+            loaded_config, indent=2, ensure_ascii=False)
+
         # Create pending config based on existing mcp_config_text if not present
         if "pending_mcp_config" not in st.session_state:
             try:
@@ -755,10 +812,11 @@ with st.sidebar:
             )
 
             # Save settings to config.json file
-            save_result = save_config_to_json(st.session_state.pending_mcp_config)
+            save_result = save_config_to_json(
+                st.session_state.pending_mcp_config)
             if not save_result:
                 st.error("❌ Failed to save settings file.")
-            
+
             progress_bar.progress(15)
 
             # Prepare session initialization
@@ -824,8 +882,34 @@ if not st.session_state.session_initialized:
 # --- Print conversation history ---
 print_message()
 
+# Sample questions
+sample_questions = [
+    "What is Cloudflare object storage?",
+    "What tools are available? Give me a list with descriptions.",
+]
+
+# Create columns for horizontal layout
+cols = st.columns(len(sample_questions))  # Creates a column for each question
+# Add buttons to columns
+for i, question in enumerate(sample_questions):
+    with cols[i]:
+        if st.button(question, key=f"sample_{i}"):
+            st.session_state.user_query = question
+
+# # Display sample questions with a header
+# # st.write("**Try asking one of these:**")
+# for question in sample_questions:
+#     # Make each question clickable to populate the input
+#     if st.button(question, key=f"sample_{question}"):
+#         # This will store the question for use in your chat
+#         st.session_state.user_query = question
+
 # --- User input and processing ---
 user_query = st.chat_input("💬 Enter your question")
+if 'user_query' in st.session_state:
+    user_query = st.session_state.user_query
+    # Clear it after use if you want
+    del st.session_state.user_query
 if user_query:
     if st.session_state.session_initialized:
         st.chat_message("user", avatar="🧑‍💻").markdown(user_query)
@@ -845,7 +929,8 @@ if user_query:
         if "error" in resp:
             st.error(resp["error"])
         else:
-            st.session_state.history.append({"role": "user", "content": user_query})
+            st.session_state.history.append(
+                {"role": "user", "content": user_query})
             st.session_state.history.append(
                 {"role": "assistant", "content": final_text}
             )

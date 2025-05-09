@@ -59,6 +59,7 @@ cp .env.example .env
 Enter your obtained API keys in the `.env` file.
 
 (Note) Not all API keys are required. Only enter the ones you need.
+
 - `ANTHROPIC_API_KEY`: If you enter an Anthropic API key, you can use "claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest", "claude-3-haiku-latest" models.
 - `OPENAI_API_KEY`: If you enter an OpenAI API key, you can use "gpt-4o", "gpt-4o-mini" models.
 - `LANGSMITH_API_KEY`: If you enter a LangSmith API key, you can use LangSmith tracing.
@@ -102,9 +103,10 @@ docker compose -f docker-compose.yaml up -d
 docker compose -f docker-compose-mac.yaml up -d
 ```
 
-4. Access the application in your browser at http://localhost:8585
+4. Access the application in your browser at <http://localhost:8585>
 
 (Note)
+
 - If you need to modify ports or other settings, edit the docker-compose.yaml file before building.
 
 ## Install Directly from Source Code
@@ -133,9 +135,11 @@ cp .env.example .env
 Enter your obtained API keys in the `.env` file.
 
 (Note) Not all API keys are required. Only enter the ones you need.
+
 - `ANTHROPIC_API_KEY`: If you enter an Anthropic API key, you can use "claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest", "claude-3-haiku-latest" models.
 - `OPENAI_API_KEY`: If you enter an OpenAI API key, you can use "gpt-4o", "gpt-4o-mini" models.
 - `LANGSMITH_API_KEY`: If you enter a LangSmith API key, you can use LangSmith tracing.
+
 ```bash
 ANTHROPIC_API_KEY=your_anthropic_api_key
 OPENAI_API_KEY=your_openai_api_key
@@ -217,8 +221,8 @@ This tutorial provides practical examples with step-by-step explanations that he
 
 ## License
 
-MIT License 
+MIT License
 
 ## References
 
-- https://github.com/langchain-ai/langchain-mcp-adapters
+- <https://github.com/langchain-ai/langchain-mcp-adapters>
