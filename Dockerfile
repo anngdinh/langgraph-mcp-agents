@@ -1,18 +1,12 @@
 FROM python:3.12-slim
 
-# Add app user
+# Add non-root user
 RUN groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid 1000 -ms /bin/bash appuser
 
-# Install Python tools
-RUN pip3 install --no-cache-dir --upgrade \
-    pip \
-    virtualenv
-
-# Install system dependencies including Node.js and npx
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    software-properties-common \
     curl \
     git \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -24,17 +18,15 @@ RUN apt-get update && apt-get install -y \
 USER appuser
 WORKDIR /home/appuser
 
-# Copy app code
-COPY . .
+# Install Python dependencies first (for caching)
+COPY --chown=appuser:appuser requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Setup virtual environment and install Python dependencies
-ENV VIRTUAL_ENV=/home/appuser/venv
-RUN virtualenv ${VIRTUAL_ENV}
-RUN . ${VIRTUAL_ENV}/bin/activate && pip install -r requirements.txt
+# Copy the rest of the app
+COPY --chown=appuser:appuser . .
 
-# Expose port for the app
+# Set entrypoint
+COPY --chown=appuser:appuser run.sh .
+RUN chmod +x run.sh
 EXPOSE 8501
-
-# Copy and set entrypoint
-COPY run.sh /home/appuser
 ENTRYPOINT ["./run.sh"]
