@@ -11,3 +11,4 @@ pymupdf>=1.25.4
 python-dotenv>=1.1.0
 streamlit>=1.44.1 
 nest-asyncio>=1.6.0
+langchain_google_genai
